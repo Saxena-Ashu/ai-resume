@@ -26,6 +26,17 @@ load_dotenv()
 openai.api_key=os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
+@app.before_first_request
+def train_classifier_once():
+    try:
+        retrain_model()
+        print("[INIT] job_title_classifier trained.")
+    except Exception as e:
+        print("[INIT ERROR] Failed to train model:", e)
+
+
+
+
 app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
@@ -574,14 +585,6 @@ def stats():
         'avg_time': f"{avg_seconds // 60} min {avg_seconds % 60} sec"
     })
 
-
-@app.before_first_request
-def train_classifier_once():
-    try:
-        retrain_model()
-        print("[INIT] job_title_classifier trained.")
-    except Exception as e:
-        print("[INIT ERROR] Failed to train model:", e)
 
 
 
