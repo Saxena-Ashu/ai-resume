@@ -19,6 +19,9 @@ from dotenv import load_dotenv
 from flask import session
 from flask_session import Session
 from datetime import datetime
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 
 # Load environment variables
@@ -26,20 +29,26 @@ load_dotenv()
 openai.api_key=os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
+
+
+
+
+
 app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+Session(app)
+
 @app.before_first_request
 def train_classifier_once():
     try:
-        from your_module import retrain_model  # or import retrain_model earlier
         retrain_model()
         print("[INIT] job_title_classifier trained.")
     except Exception as e:
         print("[INIT ERROR]", str(e))
 
 
-app.config['SESSION_PERMANENT'] = False
-Session(app)
+
 UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -55,12 +64,12 @@ online_users = {}
 
 global_ranked_results = []
 
-job_data = []
+
 job_title_classifier = Pipeline([
     ("tfidf", TfidfVectorizer(stop_words="english")),
     ("clf", LogisticRegression(max_iter=1000))
 ])
-
+job_data = []
 
 
 app.debug = True
@@ -585,7 +594,21 @@ def stats():
     })
 
 
+def retrain_model():
+    global job_title_classifier, job_data
 
+    try:
+        with open("job_data.json", "r") as f:
+            job_data = json.load(f)
+
+        X_train = [entry["description"] for entry in job_data]
+        y_train = [entry["job_title"] for entry in job_data]
+
+        job_title_classifier.fit(X_train, y_train)
+        print("[RETRAIN] Model trained successfully.")
+
+    except Exception as e:
+        print("[RETRAIN ERROR]", e)
 
 
 if __name__ == "__main__":
