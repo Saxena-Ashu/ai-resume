@@ -51,6 +51,10 @@ job_title_classifier = Pipeline([
     ("clf", LogisticRegression(max_iter=1000))
 ])
 
+
+app.debug = True
+
+
 def normalize_text(text):
     if isinstance(text, list):
         return [normalize_text(item) for item in text]
