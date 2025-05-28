@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: radial-gradient(circle at top left, #1f1c2c, #302b63, #24243e);
+            background-attachment: fixed;
+            background-size: cover;
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: -20%;
+            left: -20%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle at 30% 30%, rgba(0, 255, 255, 0.06), transparent 60%),
+                        radial-gradient(circle at 70% 70%, rgba(255, 0, 255, 0.05), transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+            filter: blur(80px);
+        }
+
+        .header {
+            position: fixed;
+            top: 15px;
+            left: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .time {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .dynamic-island {
+            position: fixed;
+            top: 40px;
+            width: 140px;
+            height: 40px;
+            background: rgba(40, 40, 60, 0.9);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 15px;
+            transition: all 0.4s ease-in-out;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .dynamic-island:hover {
+            width: 360px;
+            height: 50px;
+            background: rgba(60, 60, 90, 0.95);
+        }
+
+        .dynamic-island ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .dynamic-island:hover ul {
+            opacity: 1;
+        }
+
+        .dynamic-island ul li {
+            font-size: 14px;
+            color: white;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .dynamic-island ul li:hover {
+            color: #1e90ff;
+        }
+
+        .contact-info {
+            margin-top: 120px;
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px 25px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0px 0px 18px rgba(255, 255, 255, 0.1);
+            max-width: 600px;
+        }
+
+        .contact-info h1 {
+            font-size: 26px;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .contact-info p {
+            margin: 12px 0;
+            color: #ddd;
+        }
+
+        .contact-info a {
+            color: #1e90ff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .contact-info a:hover {
+            color: #ff6b6b;
+        }
+
+
+
+
+
+
+
+
+  #active-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #1e90ff, #0072ff);
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: 0 0 12px rgba(30, 144, 255, 0.6), 0 0 20px rgba(0, 114, 255, 0.4);
+  transition: all 0.4s ease-in-out;
+  overflow: hidden;
+  position: fixed;
+}
+
+#active-btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 300%;
+  height: 300%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transition: transform 0.6s ease-out;
+}
+
+#active-btn:hover::before {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+#active-btn:hover {
+  background: linear-gradient(135deg, #0072ff, #1e90ff);
+  box-shadow: 0 0 16px rgba(30, 144, 255, 0.8), 0 0 25px rgba(0, 114, 255, 0.6);
+  letter-spacing: 0.5px;
+}
+
+
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 300;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(4px);
+    background-color: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal-content {
+    background-color: #1b2735;
+    padding: 30px;
+    border-radius: 12px;
+    width: 300px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .modal-content h2 {
+    color: white;
+    margin-bottom: 20px;
+  }
+
+  .modal-content input {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    width: 100%;
+    margin-bottom: 20px;
+    font-size: 16px;
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .modal-buttons button {
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    width: 48%;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  #submit-password {
+    background-color: #1e90ff;
+    color: white;
+  }
+
+  #cancel-password {
+    background-color: #ccc;
+    color: #333;
+  }
+
+
+
+  @keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(30, 144, 255, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(30, 144, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(30, 144, 255, 0);
+  }
+}
+
+#active-btn {
+  animation: pulse 2s infinite;
+}
+
+  
+    </style>
+</head>
+<body>
+
+    <div class="header">ASHU</div>
+    <div class="time" id="current-time">12:00 AM</div>
+
+    <!-- Main Dynamic Island -->
+    <div class="dynamic-island">
+        <i class="fas fa-circle-notch"></i>
+        <ul>
+            <li><a href="{{ url_for('home') }}" style="text-decoration: none; color: white;">Home</a></li>
+            <li><a href="{{ url_for('about') }}" style="text-decoration: none; color: white;">About</a></li>
+            <li><a href="{{ url_for('contact') }}" style="text-decoration: none; color: white;">Contact</a></li>
+            <li><a href="{{ url_for('ai_resume_screening') }}" style="text-decoration: none; color: white;">AI</a></li>
+        </ul>
+    </div>
+
+    <div class="contact-info">
+        <h1>Contact Information</h1>
+        <p><strong>Phone No:</strong> 8439364075</p>
+        <p><strong>Email ID:</strong> <a href="mailto:ashusaxena4767@gmail.com">ashusaxena4767@gmail.com</a></p>
+    </div>
+
+
+
+
+    <!-- Active Button -->
+<button id="active-btn">Active</button>
+
+<!-- Password Modal -->
+<div id="password-modal" class="modal">
+  <div class="modal-content">
+    <h2>Enter Admin Password</h2>
+    <input type="password" id="password-input" placeholder="Password" />
+    <div class="modal-buttons">
+      <button id="submit-password">Submit</button>
+      <button id="cancel-password">Cancel</button>
+    </div>
+    <p id="error-message" style="color: red; display: none;">Incorrect password.</p>
+  </div>
+</div>
+
+
+
+
+    <script>
+        function updateTime() {
+            const now = new Date();
+            document.getElementById("current-time").innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+
+
+
+
+
+
+
+
+        const activeBtn = document.getElementById('active-btn');
+  const modal = document.getElementById('password-modal');
+  const submitBtn = document.getElementById('submit-password');
+  const cancelBtn = document.getElementById('cancel-password');
+  const passwordInput = document.getElementById('password-input');
+  const errorMsg = document.getElementById('error-message');
+
+  activeBtn.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    passwordInput.value = '';
+    errorMsg.style.display = 'none';
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+
+  submitBtn.addEventListener('click', () => {
+    const password = passwordInput.value;
+    if (password === 'ashu123') {
+      window.location.href = '/admin_stats';
+    } else {
+      errorMsg.style.display = 'block';
+    }
+  });
+
+  // Optional: close modal on Escape key
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      modal.style.display = 'none';
+    }
+  });
+    </script>
+
+</body>
+</html>

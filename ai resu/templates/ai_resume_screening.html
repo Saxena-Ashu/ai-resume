@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Resume Screening</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to right, #0f0c29, #302b63, #24243e);
+      color: white;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+      overflow-x: hidden;
+    }
+
+    .header {
+      position: fixed;
+      top: 15px;
+      left: 20px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #fff;
+      z-index: 100;
+    }
+
+    .time {
+      position: fixed;
+      top: 15px;
+      right: 20px;
+      font-size: 14px;
+      color: #ccc;
+      z-index: 100;
+    }
+
+    .dynamic-island {
+      position: fixed;
+      top: 40px;
+      width: 140px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 15px;
+      transition: all 0.4s ease-in-out;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      overflow: hidden;
+      z-index: 100;
+    }
+
+    .dynamic-island:hover {
+      width: 350px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .dynamic-island ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .dynamic-island:hover ul {
+      opacity: 1;
+    }
+
+    .dynamic-island ul li {
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: color 0.3s;
+    }
+
+    .dynamic-island ul li:hover {
+      color: #00f0ff;
+    }
+
+    .container {
+      margin-top: 150px;
+      width: 90%;
+      max-width: 600px;
+      padding: 30px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(12px);
+      position: relative;
+      z-index: 1;
+    }
+
+    h1 {
+      background: linear-gradient(to right, #00f2fe, #4facfe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 32px;
+      margin-bottom: 30px;
+    }
+
+    .floating-label {
+      position: relative;
+      margin-bottom: 25px;
+      text-align: left;
+    }
+
+    .floating-label textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      outline: none;
+      transition: all 0.3s ease;
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .file-upload-wrapper {
+      position: relative;
+      margin-bottom: 25px;
+    }
+
+    .file-upload-label {
+      display: block;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .file-upload-label:hover {
+      border-color: #00f0ff;
+      background: rgba(0, 240, 255, 0.05);
+    }
+
+    .file-upload-label i {
+      margin-right: 8px;
+    }
+
+    .file-upload-input {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .file-upload-text {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #aaa;
+      text-align: center;
+    }
+
+    .file-upload-text.has-files {
+      color: #00f0ff;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 18px;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ff416c, #ff4b2b);
+      border: none;
+      color: white;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(255, 75, 43, 0.4);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 20px;
+    }
+
+    .submit-btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 8px 25px rgba(255, 75, 43, 0.6);
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #eee;
+    }
+
+    .remove-file {
+      color: #ff6b6b;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .remove-file:hover {
+      color: #ff3838;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">ASHU</div>
+  <div class="time" id="current-time">12:00 AM</div>
+  <div class="dynamic-island">
+    <i class="fas fa-circle-notch"></i>
+    <ul>
+      <li><a href="{{ url_for('home') }}" style="text-decoration: none; color: white;">Home</a></li>
+      <li><a href="{{ url_for('about') }}" style="text-decoration: none; color: white;">About</a></li>
+      <li><a href="{{ url_for('contact') }}" style="text-decoration: none; color: white;">Contact</a></li>
+      <li><a href="{{ url_for('ai_resume_screening') }}" style="text-decoration: none; color: white;">AI</a></li>
+    </ul>
+  </div>
+
+  <div class="container">
+    <h1>AI Resume Screening</h1>
+    <form id="resumeForm" action="/process_resumes" method="POST" enctype="multipart/form-data">
+      {% if csrf_token %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% endif %}
+
+      <div class="floating-label">
+        <textarea id="job_desc" name="job_desc" placeholder=" " required></textarea>
+        <label for="job_desc">Enter Job Description</label>
+      </div>
+
+      <div class="file-upload-wrapper">
+        <label class="file-upload-label" for="resumes">
+          <i class="fas fa-cloud-upload-alt"></i>Choose Files (PDF, DOCX, JPG, PNG)
+        </label>
+        <input type="file" id="resumes" name="resumes" class="file-upload-input" 
+               accept=".pdf,.docx,.jpg,.jpeg,.png" multiple>
+        <div id="file-input-text" class="file-upload-text">No file chosen</div>
+      </div>
+
+      <div id="file-list"></div>
+
+      <button type="submit" class="submit-btn">Rank Resumes</button>
+    </form>
+  </div>
+
+  <script>
+    let filesArray = [];
+
+    document.getElementById("resumes").addEventListener("change", function(event) {
+      const fileText = document.getElementById('file-input-text');
+      if (this.files.length > 0) {
+        if (this.files.length === 1) {
+          fileText.textContent = this.files[0].name;
+        } else {
+          fileText.textContent = `${this.files.length} files selected`;
+        }
+        fileText.classList.add('has-files');
+      } else {
+        fileText.textContent = 'No file chosen';
+        fileText.classList.remove('has-files');
+      }
+
+      let newFiles = Array.from(event.target.files);
+      newFiles.forEach(file => {
+        if (!filesArray.some(f => f.name === file.name)) {
+          filesArray.push(file);
+        }
+      });
+      updateFileList();
+    });
+
+    function updateFileList() {
+      const fileList = document.getElementById("file-list");
+      fileList.innerHTML = "";
+      filesArray.forEach((file, index) => {
+        let fileDiv = document.createElement("div");
+        fileDiv.classList.add("file-item");
+        fileDiv.innerHTML = `
+          <span>${file.name}</span>
+          <span class='remove-file' onclick='removeFile(${index})'>❌</span>
+        `;
+        fileList.appendChild(fileDiv);
+      });
+    }
+
+    function removeFile(index) {
+      filesArray.splice(index, 1);
+      updateFileList();
+      
+      // Update file input text if all files are removed
+      const fileText = document.getElementById('file-input-text');
+      if (filesArray.length === 0) {
+        fileText.textContent = 'No file chosen';
+        fileText.classList.remove('has-files');
+      } else if (filesArray.length === 1) {
+        fileText.textContent = filesArray[0].name;
+      } else {
+        fileText.textContent = `${filesArray.length} files selected`;
+      }
+    }
+
+    document.getElementById("resumeForm").addEventListener("submit", function() {
+      filesArray = [];
+      updateFileList();
+    });
+
+    function updateTime() {
+      document.getElementById("current-time").innerText = new Date().toLocaleTimeString();
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+  </script>
+</body>
+</html>
