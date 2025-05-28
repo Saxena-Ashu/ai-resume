@@ -333,23 +333,27 @@ def detailed_breakdown(rank):
 
 @app.route("/process_resumes", methods=["POST"])
 def process_resumes():
-    job_desc = request.form.get("job_desc")
-    uploaded_files = request.files.getlist("resumes")
+    try:
+        job_desc = request.form.get("job_desc")
+        uploaded_files = request.files.getlist("resumes")
 
-    if not job_desc or not uploaded_files or uploaded_files[0].filename == '':
-        return redirect(url_for("ai_resume_screening"))
+        if not job_desc or not uploaded_files or uploaded_files[0].filename == '':
+            return redirect(url_for("ai_resume_screening"))
 
-    file_paths = []
-    for file in uploaded_files:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(file_path)
-        file_paths.append(file_path)
+        file_paths = []
+        for file in uploaded_files:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(file_path)
+            file_paths.append(file_path)
 
-    global global_ranked_results
-    global_ranked_results = rank_resumes(job_desc, file_paths)
+        global global_ranked_results
+        global_ranked_results = rank_resumes(job_desc, file_paths)
 
-    return redirect(url_for("results"))
+        return redirect(url_for("results"))
+    except Exception as e:
+        print("[SERVER ERROR]", e)
+        return "Internal Server Error", 500
 
 def rank_resumes(job_desc, file_paths):
     resumes_data = []
