@@ -30,47 +30,33 @@ openai.api_key=os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 
-
-
-
-
 app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
 
-@app.before_first_request
-def train_classifier_once():
+# Replacement for @app.before_first_request
+with app.app_context():
     try:
         retrain_model()
         print("[INIT] job_title_classifier trained.")
     except Exception as e:
         print("[INIT ERROR]", str(e))
 
-
-
 UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-
 
 # In-memory visit tracking
 visit_log = []
 online_users = {}
 
-
-
-
 global_ranked_results = []
-
 
 job_title_classifier = Pipeline([
     ("tfidf", TfidfVectorizer(stop_words="english")),
     ("clf", LogisticRegression(max_iter=1000))
 ])
 job_data = []
-
 
 app.debug = True
 
@@ -541,12 +527,6 @@ def test_api():
             "suggestion": "Check your OpenAI API key and quota"
         }), 500
 
-
-
-
-
-
-
 @app.before_request
 def track():
     if request.endpoint in ('static', None) or request.path.endswith(('favicon.ico', '.css', '.js')):
@@ -565,13 +545,6 @@ def track():
     online_users[session_id] = now
 
     print(f"[DEBUG] Visits: {len(visit_log)} | Today: {sum(1 for t in visit_log if t.date() == now.date())}")
-
-
-
-
-
-
-
 
 @app.route('/stats')
 def stats():
@@ -593,7 +566,6 @@ def stats():
         'avg_time': f"{avg_seconds // 60} min {avg_seconds % 60} sec"
     })
 
-
 def retrain_model():
     global job_title_classifier, job_data
 
@@ -609,7 +581,6 @@ def retrain_model():
 
     except Exception as e:
         print("[RETRAIN ERROR]", e)
-
 
 if __name__ == "__main__":
     retrain_model()
