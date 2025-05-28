@@ -26,19 +26,18 @@ load_dotenv()
 openai.api_key=os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
+app.secret_key = 'secret'
+app.config['SESSION_TYPE'] = 'filesystem'
 @app.before_first_request
 def train_classifier_once():
     try:
+        from your_module import retrain_model  # or import retrain_model earlier
         retrain_model()
         print("[INIT] job_title_classifier trained.")
     except Exception as e:
-        print("[INIT ERROR] Failed to train model:", e)
+        print("[INIT ERROR]", str(e))
 
 
-
-
-app.secret_key = 'secret'
-app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
 UPLOAD_FOLDER = "/tmp/uploads"
