@@ -14,7 +14,7 @@ from watchdog.events import FileSystemEventHandler
 import threading
 from fuzzywuzzy import fuzz
 import re
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
 from flask import session
 from flask_session import Session
@@ -23,7 +23,7 @@ from datetime import datetime
 
 # Load environment variables
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key=os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 app.secret_key = 'secret'
@@ -80,7 +80,7 @@ def extract_keywords(text):
 def generate_ai_optimized_resume(resume_text, job_requirements):
     """Generate resume using OpenAI API"""
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{
                 "role": "user",
@@ -136,7 +136,7 @@ Job Description:
 \"\"\"{description}\"\"\"
 """
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
@@ -333,27 +333,23 @@ def detailed_breakdown(rank):
 
 @app.route("/process_resumes", methods=["POST"])
 def process_resumes():
-    try:
-        job_desc = request.form.get("job_desc")
-        uploaded_files = request.files.getlist("resumes")
+    job_desc = request.form.get("job_desc")
+    uploaded_files = request.files.getlist("resumes")
 
-        if not job_desc or not uploaded_files or uploaded_files[0].filename == '':
-            return redirect(url_for("ai_resume_screening"))
+    if not job_desc or not uploaded_files or uploaded_files[0].filename == '':
+        return redirect(url_for("ai_resume_screening"))
 
-        file_paths = []
-        for file in uploaded_files:
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(file_path)
-            file_paths.append(file_path)
+    file_paths = []
+    for file in uploaded_files:
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+        file_paths.append(file_path)
 
-        global global_ranked_results
-        global_ranked_results = rank_resumes(job_desc, file_paths)
+    global global_ranked_results
+    global_ranked_results = rank_resumes(job_desc, file_paths)
 
-        return redirect(url_for("results"))
-    except Exception as e:
-        print("[SERVER ERROR]", e)
-        return "Internal Server Error", 500
+    return redirect(url_for("results"))
 
 def rank_resumes(job_desc, file_paths):
     resumes_data = []
@@ -509,7 +505,7 @@ def add_job():
 @app.route("/test_api")
 def test_api():
     try:
-        test_response = client.chat.completions.create(
+        test_response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Say 'API test successful'"}],
             max_tokens=10,
