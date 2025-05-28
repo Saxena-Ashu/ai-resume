@@ -19,17 +19,12 @@ from dotenv import load_dotenv
 from flask import session
 from flask_session import Session
 from datetime import datetime
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-
 
 # Load environment variables
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
-
 app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
@@ -63,13 +58,10 @@ def normalize_text(text):
 def extract_keywords(text):
     """Extract important keywords from text without OpenAI"""
     keywords = set()
-    # Extract capitalized words (likely proper nouns)
     keywords.update(re.findall(r'\b[A-Z][a-zA-Z]+\b', text))
-    # Extract skills section if exists
     skills_match = re.search(r'skills:\s*(.*?)(?:\n\n|$)', text, re.IGNORECASE)
     if skills_match:
         keywords.update(s.strip() for s in skills_match.group(1).split(','))
-    # Extract education qualifications
     education_match = re.search(r'education:\s*(.*?)(?:\n\n|$)', text, re.IGNORECASE)
     if education_match:
         keywords.update(s.strip() for s in education_match.group(1).split(','))
@@ -119,7 +111,6 @@ NOTE: AI optimization unavailable. Showing basic improvements.
     if missing_keywords:
         optimized += f"\n• Add these keywords: {', '.join(missing_keywords)}"
     
-    # Basic formatting improvements
     if '\n\n' not in resume_text:
         optimized = optimized.replace('\n', '\n\n')
     
@@ -154,24 +145,35 @@ Job Description:
             "education": []
         }
 
+def load_default_job_data():
+    """Load default job data if job_data.json doesn't exist"""
+    return [
+        {
+            "job_title": "Software Engineer",
+            "description": "Develops software applications using programming languages like Python, Java, or C++.",
+            "skills": ["python", "java", "c++", "software development", "algorithms", "data structures"],
+            "experience": ["2+ years programming", "team collaboration", "agile development"],
+            "education": ["Computer Science degree", "Bachelor's degree"]
+        },
+        {
+            "job_title": "Data Scientist",
+            "description": "Analyzes complex data to extract insights using statistical and machine learning techniques.",
+            "skills": ["python", "machine learning", "statistics", "data analysis", "sql"],
+            "experience": ["data modeling", "predictive analytics", "data visualization"],
+            "education": ["Statistics degree", "Master's degree"]
+        }
+    ]
+
 def retrain_model(enrich_jobs=False):
     global job_data, job_title_classifier
     try:
-        # Try to load job data from file
         if os.path.exists("job_data.json"):
             with open("job_data.json", "r") as f:
                 job_data = json.load(f)
         else:
-            # Create a default job if no file exists
-            job_data = [{
-                "job_title": "Software Engineer",
-                "description": "Develops software applications using programming languages like Python, Java, or C++.",
-                "skills": ["python", "java", "c++", "software development"],
-                "experience": ["2+ years programming", "team collaboration"],
-                "education": ["Computer Science degree"]
-            }]
+            job_data = load_default_job_data()
             with open("job_data.json", "w") as f:
-                json.dump(job_data, f)
+                json.dump(job_data, f, indent=2)
 
         for job in job_data:
             if enrich_jobs:
@@ -189,8 +191,11 @@ def retrain_model(enrich_jobs=False):
         print("[INFO] Model retrained successfully with", len(job_data), "jobs")
     except Exception as e:
         print(f"[ERROR] Failed to retrain model: {e}")
-        # Ensure we have at least the default classifier
-        job_title_classifier.fit(["software development"], ["Software Engineer"])
+        # Fallback to default data if training fails
+        job_data = load_default_job_data()
+        X_train = [job["description"] for job in job_data]
+        y_train = [job["job_title"] for job in job_data]
+        job_title_classifier.fit(X_train, y_train)
 
 class JobDataChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -231,18 +236,15 @@ def keyword_match(resume_text, keywords):
     for keyword in keywords:
         normalized_kw = normalize_text(keyword)
 
-        # Exact phrase match
         if normalized_kw in normalized_resume_text:
             matches += 1
             continue
 
-        # Partial match in lines
         for line in resume_text.splitlines():
             if normalized_kw in normalize_text(line):
                 matches += 0.7
                 break
 
-        # Fuzzy match with each word
         for resume_word in normalized_resume_text.split():
             if fuzz.ratio(normalized_kw, resume_word) > 75:
                 matches += 0.5
@@ -272,11 +274,10 @@ def infer_job_title_from_resume(resume_text):
     try:
         predicted_title = job_title_classifier.predict([resume_text])[0]
     except Exception as e:
-        print(f"[WARNING] Prediction failed, using fallback: {e}")
+        print(f"[WARNING] Prediction failed: {e}")
         predicted_title = "Software Engineer"
 
     matched_keywords = []
-
     for job in job_data:
         for kw in job["skills"] + job["experience"] + job["education"]:
             if kw in resume_text:
@@ -421,21 +422,30 @@ def rank_resumes(job_desc, file_paths):
                 "job_desc": job_desc
             }
         else:
+            # Find the most similar job based on description
+            best_match_title = max(
+                [(job["job_title"], fuzz.ratio(job["description"], job_desc)) for job in job_data],
+                key=lambda x: x[1]
+            )[0]
+            
+            best_job = next(job for job in job_data if job["job_title"] == best_match_title)
+            overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_job)
+            
             resume_data = {
                 "rank": 0,
                 "filename": os.path.basename(file_path),
-                "overall_match": 0,
-                "status": "❓ No Matching Job Found",
-                "suggested_title": "Unknown",
+                "overall_match": overall_match,
+                "status": "⚠️ Potential Match",
+                "suggested_title": best_match_title,
                 "predicted_title": predicted_title,
                 "alternative_titles": suggested_titles,
-                "suggestions": ["⚠️ No matching job title in our database"],
-                "skill_match": "N/A",
-                "exp_match": "N/A",
-                "edu_match": "N/A",
-                "technical_skills": {"present": [], "missing": []},
-                "relevant_experience": {"present": [], "missing": []},
-                "education_required": {"present": [], "missing": []},
+                "suggestions": generate_suggestions(best_match_title, resume_text),
+                "skill_match": f"{skill_score:.1f}%",
+                "exp_match": f"{exp_score:.1f}%",
+                "edu_match": f"{edu_score:.1f}%",
+                "technical_skills": split_present_missing(best_job["skills"], resume_text),
+                "relevant_experience": split_present_missing(best_job["experience"], resume_text),
+                "education_required": split_present_missing(best_job["education"], resume_text),
                 "certificates": [],
                 "achievements": [],
                 "additional_skills": [],
@@ -462,7 +472,6 @@ def optimize_resume():
         }), 400
     
     try:
-        # Try AI first
         ai_optimized = generate_ai_optimized_resume(data["resume_text"], data["job_desc"])
         if ai_optimized:
             return jsonify({
@@ -471,7 +480,6 @@ def optimize_resume():
                 "status": "success"
             })
         
-        # Fallback to basic version
         basic_optimized = generate_basic_optimized_resume(data["resume_text"], data["job_desc"])
         return jsonify({
             "optimized_resume": basic_optimized,
@@ -552,7 +560,7 @@ def track():
     
     if not session.get('logged_visit'):
         visit_log.append(now)
-        session['logged_visit'] = True  # ✅ Mark visit counted
+        session['logged_visit'] = True
 
     session_id = session['id']
     online_users[session_id] = now
@@ -580,8 +588,7 @@ def stats():
     })
 
 if __name__ == "__main__":
-    # Initialize the model when starting the app
     retrain_model()
     start_file_watcher()
-    port = int(os.environ.get("PORT", 5007))  # Render sets $PORT
+    port = int(os.environ.get("PORT", 5007))
     app.run(host="0.0.0.0", port=port)
