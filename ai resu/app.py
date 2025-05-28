@@ -26,7 +26,7 @@ from sklearn.linear_model import LogisticRegression
 
 # Load environment variables
 load_dotenv()
-openai.api_key=os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 
@@ -34,14 +34,6 @@ app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
-
-# Replacement for @app.before_first_request
-with app.app_context():
-    try:
-        retrain_model()
-        print("[INIT] job_title_classifier trained.")
-    except Exception as e:
-        print("[INIT ERROR]", str(e))
 
 UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -52,11 +44,12 @@ online_users = {}
 
 global_ranked_results = []
 
+# Initialize job data and classifier
+job_data = []
 job_title_classifier = Pipeline([
     ("tfidf", TfidfVectorizer(stop_words="english")),
     ("clf", LogisticRegression(max_iter=1000))
 ])
-job_data = []
 
 app.debug = True
 
@@ -164,8 +157,21 @@ Job Description:
 def retrain_model(enrich_jobs=False):
     global job_data, job_title_classifier
     try:
-        with open("job_data.json", "r") as f:
-            job_data = json.load(f)
+        # Try to load job data from file
+        if os.path.exists("job_data.json"):
+            with open("job_data.json", "r") as f:
+                job_data = json.load(f)
+        else:
+            # Create a default job if no file exists
+            job_data = [{
+                "job_title": "Software Engineer",
+                "description": "Develops software applications using programming languages like Python, Java, or C++.",
+                "skills": ["python", "java", "c++", "software development"],
+                "experience": ["2+ years programming", "team collaboration"],
+                "education": ["Computer Science degree"]
+            }]
+            with open("job_data.json", "w") as f:
+                json.dump(job_data, f)
 
         for job in job_data:
             if enrich_jobs:
@@ -183,6 +189,8 @@ def retrain_model(enrich_jobs=False):
         print("[INFO] Model retrained successfully with", len(job_data), "jobs")
     except Exception as e:
         print(f"[ERROR] Failed to retrain model: {e}")
+        # Ensure we have at least the default classifier
+        job_title_classifier.fit(["software development"], ["Software Engineer"])
 
 class JobDataChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -261,7 +269,12 @@ def infer_job_title_from_resume(resume_text):
     if not resume_text.strip():
         return "Unknown", []
 
-    predicted_title = job_title_classifier.predict([resume_text])[0]
+    try:
+        predicted_title = job_title_classifier.predict([resume_text])[0]
+    except Exception as e:
+        print(f"[WARNING] Prediction failed, using fallback: {e}")
+        predicted_title = "Software Engineer"
+
     matched_keywords = []
 
     for job in job_data:
@@ -566,23 +579,8 @@ def stats():
         'avg_time': f"{avg_seconds // 60} min {avg_seconds % 60} sec"
     })
 
-def retrain_model():
-    global job_title_classifier, job_data
-
-    try:
-        with open("job_data.json", "r") as f:
-            job_data = json.load(f)
-
-        X_train = [entry["description"] for entry in job_data]
-        y_train = [entry["job_title"] for entry in job_data]
-
-        job_title_classifier.fit(X_train, y_train)
-        print("[RETRAIN] Model trained successfully.")
-
-    except Exception as e:
-        print("[RETRAIN ERROR]", e)
-
 if __name__ == "__main__":
+    # Initialize the model when starting the app
     retrain_model()
     start_file_watcher()
     port = int(os.environ.get("PORT", 5007))  # Render sets $PORT
