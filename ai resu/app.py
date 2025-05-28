@@ -30,7 +30,7 @@ app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -52,8 +52,8 @@ job_title_classifier = Pipeline([
 ])
 
 
-app.debug = True
 
+app.debug = True
 
 def normalize_text(text):
     if isinstance(text, list):
@@ -582,4 +582,5 @@ def stats():
 if __name__ == "__main__":
     retrain_model()
     start_file_watcher()
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    port = int(os.environ.get("PORT", 5007))  # Render sets $PORT
+    app.run(host="0.0.0.0", port=port)
