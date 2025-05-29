@@ -147,7 +147,7 @@ Job Description:
 
 def load_default_job_data():
     """Load default job data if job_data.json doesn't exist"""
-    return [
+    default_jobs = [
         {
             "job_title": "Software Engineer",
             "description": "Develops software applications using programming languages like Python, Java, or C++.",
@@ -163,6 +163,11 @@ def load_default_job_data():
             "education": ["Statistics degree", "Master's degree"]
         }
     ]
+    # Save default jobs to file if it doesn't exist
+    if not os.path.exists("job_data.json"):
+        with open("job_data.json", "w") as f:
+            json.dump(default_jobs, f, indent=2)
+    return default_jobs
 
 def retrain_model(enrich_jobs=False):
     global job_data, job_title_classifier
@@ -172,8 +177,10 @@ def retrain_model(enrich_jobs=False):
                 job_data = json.load(f)
         else:
             job_data = load_default_job_data()
-            with open("job_data.json", "w") as f:
-                json.dump(job_data, f, indent=2)
+
+        # Ensure we have at least one job
+        if not job_data:
+            job_data = load_default_job_data()
 
         for job in job_data:
             if enrich_jobs:
@@ -422,30 +429,31 @@ def rank_resumes(job_desc, file_paths):
                 "job_desc": job_desc
             }
         else:
-            # Find the most similar job based on description
-            best_match_title = max(
-                [(job["job_title"], fuzz.ratio(job["description"], job_desc)) for job in job_data],
-                key=lambda x: x[1]
-            )[0]
+            # If no job matches, use the first job as fallback
+            fallback_job = job_data[0] if job_data else {
+                "job_title": "General Position",
+                "skills": [],
+                "experience": [],
+                "education": []
+            }
             
-            best_job = next(job for job in job_data if job["job_title"] == best_match_title)
-            overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_job)
+            overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, fallback_job)
             
             resume_data = {
                 "rank": 0,
                 "filename": os.path.basename(file_path),
                 "overall_match": overall_match,
                 "status": "⚠️ Potential Match",
-                "suggested_title": best_match_title,
+                "suggested_title": fallback_job["job_title"],
                 "predicted_title": predicted_title,
                 "alternative_titles": suggested_titles,
-                "suggestions": generate_suggestions(best_match_title, resume_text),
+                "suggestions": ["No specific job match found. Showing general assessment."],
                 "skill_match": f"{skill_score:.1f}%",
                 "exp_match": f"{exp_score:.1f}%",
                 "edu_match": f"{edu_score:.1f}%",
-                "technical_skills": split_present_missing(best_job["skills"], resume_text),
-                "relevant_experience": split_present_missing(best_job["experience"], resume_text),
-                "education_required": split_present_missing(best_job["education"], resume_text),
+                "technical_skills": split_present_missing(fallback_job["skills"], resume_text),
+                "relevant_experience": split_present_missing(fallback_job["experience"], resume_text),
+                "education_required": split_present_missing(fallback_job["education"], resume_text),
                 "certificates": [],
                 "achievements": [],
                 "additional_skills": [],
