@@ -14,37 +14,44 @@ from watchdog.events import FileSystemEventHandler
 import threading
 from fuzzywuzzy import fuzz
 import re
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 from flask import session
 from flask_session import Session
 from datetime import datetime
 
+
 # Load environment variables
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = Flask(__name__)
 app.secret_key = 'secret'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
-
-UPLOAD_FOLDER = "/tmp/uploads"
+UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+
 
 # In-memory visit tracking
 visit_log = []
 online_users = {}
 
+
+
+
 global_ranked_results = []
 
-# Initialize job data and classifier
 job_data = []
 job_title_classifier = Pipeline([
     ("tfidf", TfidfVectorizer(stop_words="english")),
     ("clf", LogisticRegression(max_iter=1000))
 ])
+
+
 
 app.debug = True
 
@@ -56,7 +63,7 @@ def normalize_text(text):
     return ' '.join(text.split())
 
 def extract_keywords(text):
-    """Extract important keywords from text"""
+    """Extract important keywords from text without OpenAI"""
     keywords = set()
     # Extract capitalized words (likely proper nouns)
     keywords.update(re.findall(r'\b[A-Z][a-zA-Z]+\b', text))
@@ -73,7 +80,7 @@ def extract_keywords(text):
 def generate_ai_optimized_resume(resume_text, job_requirements):
     """Generate resume using OpenAI API"""
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{
                 "role": "user",
@@ -114,6 +121,7 @@ NOTE: AI optimization unavailable. Showing basic improvements.
     if missing_keywords:
         optimized += f"\n• Add these keywords: {', '.join(missing_keywords)}"
     
+    # Basic formatting improvements
     if '\n\n' not in resume_text:
         optimized = optimized.replace('\n', '\n\n')
     
@@ -128,7 +136,7 @@ Job Description:
 \"\"\"{description}\"\"\"
 """
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
@@ -148,49 +156,11 @@ Job Description:
             "education": []
         }
 
-def load_default_job_data():
-    """Load default job data if job_data.json doesn't exist"""
-    default_jobs = [
-        {
-            "job_title": "Software Engineer",
-            "description": "Develops software applications using programming languages like Python, Java, or C++.",
-            "skills": ["python", "java", "c++", "software development", "algorithms", "data structures"],
-            "experience": ["2+ years programming", "team collaboration", "agile development"],
-            "education": ["Computer Science degree", "Bachelor's degree"]
-        },
-        {
-            "job_title": "Data Scientist",
-            "description": "Analyzes complex data to extract insights using statistical and machine learning techniques.",
-            "skills": ["python", "machine learning", "statistics", "data analysis", "sql"],
-            "experience": ["data modeling", "predictive analytics", "data visualization"],
-            "education": ["Statistics degree", "Master's degree"]
-        },
-        {
-            "job_title": "Web Developer",
-            "description": "Builds and maintains websites using technologies like HTML, CSS, JavaScript, and frameworks.",
-            "skills": ["html", "css", "javascript", "react", "node.js"],
-            "experience": ["web development", "responsive design", "front-end development"],
-            "education": ["Computer Science degree", "Web Development certification"]
-        }
-    ]
-    # Save default jobs to file if it doesn't exist
-    if not os.path.exists("job_data.json"):
-        with open("job_data.json", "w") as f:
-            json.dump(default_jobs, f, indent=2)
-    return default_jobs
-
 def retrain_model(enrich_jobs=False):
     global job_data, job_title_classifier
     try:
-        if os.path.exists("job_data.json"):
-            with open("job_data.json", "r") as f:
-                job_data = json.load(f)
-        else:
-            job_data = load_default_job_data()
-
-        # Ensure we have at least one job
-        if not job_data:
-            job_data = load_default_job_data()
+        with open("job_data.json", "r") as f:
+            job_data = json.load(f)
 
         for job in job_data:
             if enrich_jobs:
@@ -208,11 +178,6 @@ def retrain_model(enrich_jobs=False):
         print("[INFO] Model retrained successfully with", len(job_data), "jobs")
     except Exception as e:
         print(f"[ERROR] Failed to retrain model: {e}")
-        # Fallback to default data if training fails
-        job_data = load_default_job_data()
-        X_train = [job["description"] for job in job_data]
-        y_train = [job["job_title"] for job in job_data]
-        job_title_classifier.fit(X_train, y_train)
 
 class JobDataChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -280,10 +245,9 @@ def compute_match_score(resume_text, job_info):
     exp_matches = keyword_match(resume_text, job_info["experience"])
     edu_matches = keyword_match(resume_text, job_info["education"])
 
-    # Ensure we don't divide by zero
-    skill_score = (skill_matches / max(1, len(job_info["skills"]))) * 100
-    exp_score = (exp_matches / max(1, len(job_info["experience"]))) * 100
-    edu_score = (edu_matches / max(1, len(job_info["education"]))) * 100
+    skill_score = (skill_matches / len(job_info["skills"])) * 100 if job_info["skills"] else 0
+    exp_score = (exp_matches / len(job_info["experience"])) * 100 if job_info["experience"] else 0
+    edu_score = (edu_matches / len(job_info["education"])) * 100 if job_info["education"] else 0
 
     total_score = round(skill_score * 0.5 + exp_score * 0.3 + edu_score * 0.2, 2)
     return total_score, skill_score, exp_score, edu_score
@@ -292,13 +256,9 @@ def infer_job_title_from_resume(resume_text):
     if not resume_text.strip():
         return "Unknown", []
 
-    try:
-        predicted_title = job_title_classifier.predict([resume_text])[0]
-    except Exception as e:
-        print(f"[WARNING] Prediction failed: {e}")
-        predicted_title = "Software Engineer"
-
+    predicted_title = job_title_classifier.predict([resume_text])[0]
     matched_keywords = []
+
     for job in job_data:
         for kw in job["skills"] + job["experience"] + job["education"]:
             if kw in resume_text:
@@ -443,46 +403,21 @@ def rank_resumes(job_desc, file_paths):
                 "job_desc": job_desc
             }
         else:
-            # If no job matches, find the closest match based on description similarity
-            best_match = None
-            best_similarity = 0
-            for job in job_data:
-                similarity = fuzz.ratio(job["description"].lower(), job_desc.lower())
-                if similarity > best_similarity:
-                    best_similarity = similarity
-                    best_match = job
-            
-            if best_match:
-                overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_match)
-                status = "⚠️ Potential Match"
-                suggestions = ["This resume doesn't perfectly match any job, but shows potential for this role."]
-            else:
-                # Fallback to first job if no matches at all
-                best_match = job_data[0] if job_data else {
-                    "job_title": "General Position",
-                    "skills": [],
-                    "experience": [],
-                    "education": []
-                }
-                overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_match)
-                status = "⚠️ General Assessment"
-                suggestions = ["No specific job match found. Showing general assessment."]
-
             resume_data = {
                 "rank": 0,
                 "filename": os.path.basename(file_path),
-                "overall_match": overall_match,
-                "status": status,
-                "suggested_title": best_match["job_title"],
+                "overall_match": 0,
+                "status": "❓ No Matching Job Found",
+                "suggested_title": "Unknown",
                 "predicted_title": predicted_title,
                 "alternative_titles": suggested_titles,
-                "suggestions": suggestions,
-                "skill_match": f"{skill_score:.1f}%",
-                "exp_match": f"{exp_score:.1f}%",
-                "edu_match": f"{edu_score:.1f}%",
-                "technical_skills": split_present_missing(best_match["skills"], resume_text),
-                "relevant_experience": split_present_missing(best_match["experience"], resume_text),
-                "education_required": split_present_missing(best_match["education"], resume_text),
+                "suggestions": ["⚠️ No matching job title in our database"],
+                "skill_match": "N/A",
+                "exp_match": "N/A",
+                "edu_match": "N/A",
+                "technical_skills": {"present": [], "missing": []},
+                "relevant_experience": {"present": [], "missing": []},
+                "education_required": {"present": [], "missing": []},
                 "certificates": [],
                 "achievements": [],
                 "additional_skills": [],
@@ -509,6 +444,7 @@ def optimize_resume():
         }), 400
     
     try:
+        # Try AI first
         ai_optimized = generate_ai_optimized_resume(data["resume_text"], data["job_desc"])
         if ai_optimized:
             return jsonify({
@@ -517,6 +453,7 @@ def optimize_resume():
                 "status": "success"
             })
         
+        # Fallback to basic version
         basic_optimized = generate_basic_optimized_resume(data["resume_text"], data["job_desc"])
         return jsonify({
             "optimized_resume": basic_optimized,
@@ -568,7 +505,7 @@ def add_job():
 @app.route("/test_api")
 def test_api():
     try:
-        test_response = openai.ChatCompletion.create(
+        test_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Say 'API test successful'"}],
             max_tokens=10,
@@ -585,6 +522,12 @@ def test_api():
             "suggestion": "Check your OpenAI API key and quota"
         }), 500
 
+
+
+
+
+
+
 @app.before_request
 def track():
     if request.endpoint in ('static', None) or request.path.endswith(('favicon.ico', '.css', '.js')):
@@ -597,12 +540,19 @@ def track():
     
     if not session.get('logged_visit'):
         visit_log.append(now)
-        session['logged_visit'] = True
+        session['logged_visit'] = True  # ✅ Mark visit counted
 
     session_id = session['id']
     online_users[session_id] = now
 
     print(f"[DEBUG] Visits: {len(visit_log)} | Today: {sum(1 for t in visit_log if t.date() == now.date())}")
+
+
+
+
+
+
+
 
 @app.route('/stats')
 def stats():
@@ -624,8 +574,12 @@ def stats():
         'avg_time': f"{avg_seconds // 60} min {avg_seconds % 60} sec"
     })
 
+
+
+
+
+
 if __name__ == "__main__":
     retrain_model()
     start_file_watcher()
-    port = int(os.environ.get("PORT", 5007))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=5001)
