@@ -576,10 +576,9 @@ def stats():
 
 
 
-
+retrain_model()
+start_file_watcher()
 
 
 if __name__ == "__main__":
-    retrain_model()
-    start_file_watcher()
     app.run(debug=True, host="0.0.0.0", port=5001)
