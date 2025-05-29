@@ -56,12 +56,15 @@ def normalize_text(text):
     return ' '.join(text.split())
 
 def extract_keywords(text):
-    """Extract important keywords from text without OpenAI"""
+    """Extract important keywords from text"""
     keywords = set()
+    # Extract capitalized words (likely proper nouns)
     keywords.update(re.findall(r'\b[A-Z][a-zA-Z]+\b', text))
+    # Extract skills section if exists
     skills_match = re.search(r'skills:\s*(.*?)(?:\n\n|$)', text, re.IGNORECASE)
     if skills_match:
         keywords.update(s.strip() for s in skills_match.group(1).split(','))
+    # Extract education qualifications
     education_match = re.search(r'education:\s*(.*?)(?:\n\n|$)', text, re.IGNORECASE)
     if education_match:
         keywords.update(s.strip() for s in education_match.group(1).split(','))
@@ -161,6 +164,13 @@ def load_default_job_data():
             "skills": ["python", "machine learning", "statistics", "data analysis", "sql"],
             "experience": ["data modeling", "predictive analytics", "data visualization"],
             "education": ["Statistics degree", "Master's degree"]
+        },
+        {
+            "job_title": "Web Developer",
+            "description": "Builds and maintains websites using technologies like HTML, CSS, JavaScript, and frameworks.",
+            "skills": ["html", "css", "javascript", "react", "node.js"],
+            "experience": ["web development", "responsive design", "front-end development"],
+            "education": ["Computer Science degree", "Web Development certification"]
         }
     ]
     # Save default jobs to file if it doesn't exist
@@ -243,15 +253,18 @@ def keyword_match(resume_text, keywords):
     for keyword in keywords:
         normalized_kw = normalize_text(keyword)
 
+        # Exact phrase match
         if normalized_kw in normalized_resume_text:
             matches += 1
             continue
 
+        # Partial match in lines
         for line in resume_text.splitlines():
             if normalized_kw in normalize_text(line):
                 matches += 0.7
                 break
 
+        # Fuzzy match with each word
         for resume_word in normalized_resume_text.split():
             if fuzz.ratio(normalized_kw, resume_word) > 75:
                 matches += 0.5
@@ -267,9 +280,10 @@ def compute_match_score(resume_text, job_info):
     exp_matches = keyword_match(resume_text, job_info["experience"])
     edu_matches = keyword_match(resume_text, job_info["education"])
 
-    skill_score = (skill_matches / len(job_info["skills"])) * 100 if job_info["skills"] else 0
-    exp_score = (exp_matches / len(job_info["experience"])) * 100 if job_info["experience"] else 0
-    edu_score = (edu_matches / len(job_info["education"])) * 100 if job_info["education"] else 0
+    # Ensure we don't divide by zero
+    skill_score = (skill_matches / max(1, len(job_info["skills"]))) * 100
+    exp_score = (exp_matches / max(1, len(job_info["experience"]))) * 100
+    edu_score = (edu_matches / max(1, len(job_info["education"]))) * 100
 
     total_score = round(skill_score * 0.5 + exp_score * 0.3 + edu_score * 0.2, 2)
     return total_score, skill_score, exp_score, edu_score
@@ -429,31 +443,46 @@ def rank_resumes(job_desc, file_paths):
                 "job_desc": job_desc
             }
         else:
-            # If no job matches, use the first job as fallback
-            fallback_job = job_data[0] if job_data else {
-                "job_title": "General Position",
-                "skills": [],
-                "experience": [],
-                "education": []
-            }
+            # If no job matches, find the closest match based on description similarity
+            best_match = None
+            best_similarity = 0
+            for job in job_data:
+                similarity = fuzz.ratio(job["description"].lower(), job_desc.lower())
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match = job
             
-            overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, fallback_job)
-            
+            if best_match:
+                overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_match)
+                status = "⚠️ Potential Match"
+                suggestions = ["This resume doesn't perfectly match any job, but shows potential for this role."]
+            else:
+                # Fallback to first job if no matches at all
+                best_match = job_data[0] if job_data else {
+                    "job_title": "General Position",
+                    "skills": [],
+                    "experience": [],
+                    "education": []
+                }
+                overall_match, skill_score, exp_score, edu_score = compute_match_score(resume_text, best_match)
+                status = "⚠️ General Assessment"
+                suggestions = ["No specific job match found. Showing general assessment."]
+
             resume_data = {
                 "rank": 0,
                 "filename": os.path.basename(file_path),
                 "overall_match": overall_match,
-                "status": "⚠️ Potential Match",
-                "suggested_title": fallback_job["job_title"],
+                "status": status,
+                "suggested_title": best_match["job_title"],
                 "predicted_title": predicted_title,
                 "alternative_titles": suggested_titles,
-                "suggestions": ["No specific job match found. Showing general assessment."],
+                "suggestions": suggestions,
                 "skill_match": f"{skill_score:.1f}%",
                 "exp_match": f"{exp_score:.1f}%",
                 "edu_match": f"{edu_score:.1f}%",
-                "technical_skills": split_present_missing(fallback_job["skills"], resume_text),
-                "relevant_experience": split_present_missing(fallback_job["experience"], resume_text),
-                "education_required": split_present_missing(fallback_job["education"], resume_text),
+                "technical_skills": split_present_missing(best_match["skills"], resume_text),
+                "relevant_experience": split_present_missing(best_match["experience"], resume_text),
+                "education_required": split_present_missing(best_match["education"], resume_text),
                 "certificates": [],
                 "achievements": [],
                 "additional_skills": [],
